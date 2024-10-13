@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class NewBehaviourScript : MonoBehaviour
@@ -38,29 +39,37 @@ public class NewBehaviourScript : MonoBehaviour
     private int plusScore = 0; //スコアの加算用
     public Text scoreText;
 
+    public Text finish;
+
     //フェードイン----------------------------------
     public CanvasGroup canvasGroup;
     private bool isFade = false;
     private float fadeSpeed = 0.5f; //フェードの速さ
 
     public Text gameover;  //フェード終わった後のテキスト
+    private bool isSceneReset = false;  //シーンを切り替えていいかのフラグ
     
     // Start is called before the first frame update
     void Start()
     {
         plusScore = 0; // 初期化
         scoreText.text = "SCORE：" + plusScore.ToString("d8");
+        finish.text = "SCORE：" + plusScore.ToString("d8");
         canvasGroup.alpha = 0;  //初期は透明
         gameover.gameObject.SetActive(false);
+        finish.gameObject.SetActive(false);
     }
 
+    //スコアを加算していく
     public void ScoreAdd()
     {
         plusScore = plusScore + 100;
         //Debug.Log("Score added: " + plusScore); 
         scoreText.text = "SCORE：" + plusScore.ToString("d8");
+        finish.text = "SCORE：" + plusScore.ToString("d8");
     }
 
+    //どのタワーが発射完了か
     public Tower ShotSet()
     {
         foreach (Tower towerPoint in Tower)
@@ -74,7 +83,7 @@ public class NewBehaviourScript : MonoBehaviour
         return null;
     }
 
-    
+    //カメラにうつっている範囲の取得
     private Vector3 CameraRandomPosition()
     {
         //カメラの範囲を取得
@@ -89,13 +98,39 @@ public class NewBehaviourScript : MonoBehaviour
 
         return new Vector3(randomX, randomY, 0);
     }
+
+
     // Update is called once per frame
     void Update()
     {
         slider.value = Life;
 
+        ReticleUpdate();
 
-        #region レティクル
+
+
+        meteoAction();
+
+        if (Life <= 0.0f)
+        {
+            GameOverAction();
+        }
+
+        if (isFade)
+        {
+            FeadAction();
+        }
+
+        //キー押したらシーンリセット
+        if(isSceneReset && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)))
+        {
+            ResetScene();
+        }
+    }
+
+    //レティクルの動き
+    void ReticleUpdate()
+    {
         //レティクルの生成-------------------------------------------------
         if (Input.GetMouseButtonDown(0))
         {
@@ -112,11 +147,13 @@ public class NewBehaviourScript : MonoBehaviour
                 towerPoint.Shot(clickPosition);
             }
         }
+    }
 
-        #endregion
-
+    //タワーがすべて消えてからの動き
+    void meteoAction()
+    {
         meteo obj = null;
-        #region 弾関係
+
         //弾の処理---------------------------------------------------------
         time += Time.deltaTime;
         if (time >= startTime)
@@ -134,9 +171,7 @@ public class NewBehaviourScript : MonoBehaviour
 
             time = time - startTime;
         }
-        #endregion
 
-        #region タワーが全部消えたら
         for (int i = 0; i < Tower.Count; i++)
         {
             if (Tower[i] != null)//じゃなかったら
@@ -158,41 +193,43 @@ public class NewBehaviourScript : MonoBehaviour
                 obj.speed = 5.0f;
             }
         }
-        #endregion
-
-
-        if (Life <= 0.0f)
+    }
+    //ゲームオーバーになったとき
+    void GameOverAction()
+    {
+        explosionTime += Time.deltaTime;
+        if (explosionTime >= startExTime)
         {
-            explosionTime += Time.deltaTime;
-            if (explosionTime >= startExTime)
+            if (isFade)
             {
-                if (isFade)
-                {
-                    Vector3 randomPosition = CameraRandomPosition();
-                    explosion obi = Instantiate(explosion, randomPosition, Quaternion.identity);
-                    explosionTime = explosionTime - startExTime;
-                }
-
-                //フェードイン開始
-                isFade = true;
-                isLife = false;
+                Vector3 randomPosition = CameraRandomPosition();
+                explosion obi = Instantiate(explosion, randomPosition, Quaternion.identity);
+                explosionTime = explosionTime - startExTime;
             }
 
-        }
-
-        if (isFade)
-        {
-            canvasGroup.alpha += fadeSpeed * Time.deltaTime;
-            if (canvasGroup.alpha >= 1.0f)
-            {
-                canvasGroup.alpha = 1.0f;
-                gameover.gameObject.SetActive(true);
-                isFade = false;
-                
-            }
+            //フェードイン開始
+            isFade = true;
+            isLife = false;
         }
     }
-
+    //  フェードが完了してからの動き
+    void FeadAction()
+    {
+        canvasGroup.alpha += fadeSpeed * Time.deltaTime;
+        if (canvasGroup.alpha >= 1.0f)
+        {
+            canvasGroup.alpha = 1.0f;
+            gameover.gameObject.SetActive(true);
+            finish.gameObject.SetActive(true);
+            isFade = false;
+            isSceneReset = true;
+        }
+    }
+    //シーンリセット
+    void ResetScene()
+    {
+        SceneManager.LoadScene("SampleScene", LoadSceneMode.Single); // 現在のシーンを再読み込み
+    }
 
     //Groundとmeteoが当たった時のシェイク
     public void TriggerShake()
